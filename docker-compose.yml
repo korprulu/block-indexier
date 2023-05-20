@@ -1,0 +1,17 @@
+networks:
+  homework:
+    driver: 'bridge'
+
+services:
+  redis:
+    image: redis:7.0.11-alpine
+    container_name: homework-redis
+    hostname: homework-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: always
+    user: "root:root" # Note that Consul is run under the 'consul' user, but entry point scripts need to first run as root
+    networks:
+      - homework
+    security_opt:
+      - no-new-privileges:true
