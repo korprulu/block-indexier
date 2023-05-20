@@ -2,6 +2,8 @@ package pkg
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	goredis "github.com/redis/go-redis/v9"
 )
@@ -34,24 +36,25 @@ func NewRedisStream(ctx context.Context, cfg RedisStreamConfig) (*RedisStream, e
 		consumerName: cfg.ConsumerName,
 	}
 
-	if err := stream.registerConsumer(ctx); err != nil {
+	err := cfg.Client.XGroupCreateMkStream(ctx, cfg.StreamName, cfg.GroupName, "$").Err()
+	if err != nil {
+		if !strings.HasPrefix(err.Error(), "BUSYGROUP") {
+			return nil, err
+		}
+	}
+
+	err = cfg.Client.XAutoClaim(ctx, &goredis.XAutoClaimArgs{
+		Stream:   cfg.StreamName,
+		Group:    cfg.GroupName,
+		Consumer: cfg.ConsumerName,
+		MinIdle:  time.Minute * 10,
+		Start:    "0-0",
+	}).Err()
+	if err != nil {
 		return nil, err
 	}
 
 	return stream, nil
-}
-
-func (r *RedisStream) registerConsumer(ctx context.Context) error {
-	redisClient := r.client
-	if err := redisClient.XGroupCreateMkStream(ctx, r.streamName, r.groupName, "$").Err(); err != nil {
-		return err
-	}
-
-	return redisClient.XGroupCreateConsumer(ctx, r.streamName, r.groupName, r.consumerName).Err()
-}
-
-func (r *RedisStream) deregisterConsumer(ctx context.Context) error {
-	return r.client.XGroupDelConsumer(ctx, r.streamName, r.groupName, r.consumerName).Err()
 }
 
 // Read reads messages from the stream
@@ -72,7 +75,7 @@ func (r *RedisStream) Read(ctx context.Context, id string, count int) ([]StreamM
 	for _, stream := range streams {
 		for _, message := range stream.Messages {
 			result = append(result, StreamMessage{
-				ID:    message.ID,
+				ID:     message.ID,
 				Values: message.Values,
 			})
 		}
@@ -91,13 +94,14 @@ func (r *RedisStream) Add(ctx context.Context, values StreamValue) (string, erro
 	return r.client.XAdd(ctx, &goredis.XAddArgs{
 		Stream: r.streamName,
 		ID:     "*",
-		Values: values,
+		Values: map[string]any(values),
 	}).Result()
 }
 
-// Close closes the stream consumer
-func (r *RedisStream) Close(ctx context.Context) error {
-	return r.deregisterConsumer(ctx)
+// Close closes the stream
+func (r *RedisStream) Close() {
+	// noop
+	return
 }
 
 var (

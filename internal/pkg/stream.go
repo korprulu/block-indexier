@@ -25,7 +25,7 @@ type (
 	StreamConsumer interface {
 		Read(ctx context.Context, id string, count int) ([]StreamMessage, error)
 		Ack(ctx context.Context, id string) error
-		Close(ctx context.Context) error
+		Close()
 	}
 
 	// Stream is the interface for a stream
