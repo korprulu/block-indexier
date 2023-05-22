@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -25,6 +26,12 @@ type EthClientConfig struct {
 type BatchTransctionReceiptsResult struct {
 	Receipt *types.Receipt
 	Err     error
+}
+
+// BatchHeaderByNumberResult is the result of a batch head by number call
+type BatchHeaderByNumberResult struct {
+	Header *types.Header
+	Err    error
 }
 
 // NewEthClient creates a new Ethereum client
@@ -58,6 +65,33 @@ func (c *EthClient) BatchTransactionReceipts(ctx context.Context, hash ...common
 		result[i] = BatchTransctionReceiptsResult{
 			Receipt: elem.Result.(*types.Receipt),
 			Err:     elem.Error,
+		}
+	}
+
+	return result, err
+}
+
+// BatchHeaderByNumbers returns the headers for the given block numbers
+func (c *EthClient) BatchHeaderByNumbers(ctx context.Context, numbers ...uint64) ([]BatchHeaderByNumberResult, error) {
+	batchElem := make([]rpc.BatchElem, len(numbers))
+	for i, n := range numbers {
+		batchElem[i] = rpc.BatchElem{
+			Method: "eth_getBlockByNumber",
+			Args:   []any{hexutil.EncodeUint64(n), false},
+			Result: &types.Header{},
+		}
+	}
+
+	err := c.rpc.BatchCallContext(ctx, batchElem)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]BatchHeaderByNumberResult, len(batchElem))
+	for i, elem := range batchElem {
+		result[i] = BatchHeaderByNumberResult{
+			Header: elem.Result.(*types.Header),
+			Err:    elem.Error,
 		}
 	}
 
