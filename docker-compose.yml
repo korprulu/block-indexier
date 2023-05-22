@@ -1,0 +1,86 @@
+networks:
+  homework:
+    driver: 'bridge'
+
+services:
+  redis:
+    image: redis:7.0.11-alpine
+    container_name: homework-redis
+    hostname: homework-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: always
+    user: "root:root" # Note that Consul is run under the 'consul' user, but entry point scripts need to first run as root
+    networks:
+      - homework
+    security_opt:
+      - no-new-privileges:true
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile-postgres
+    container_name: homework-postgresql
+    hostname: homework-postgresql
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    networks:
+      - homework
+  block_processor:
+    build:
+      context: .
+      dockerfile: cmd/block_processor/Dockerfile
+    container_name: homework-block-processor
+    hostname: homework-block-processor
+    networks:
+      - homework
+    depends_on:
+      - redis
+      - postgres
+  tx_processor:
+    build:
+      context: .
+      dockerfile: cmd/tx_processor/Dockerfile
+    container_name: homework-tx-processor
+    hostname: homework-tx-processor
+    networks:
+      - homework
+    depends_on:
+      - redis
+      - postgres
+  scanner:
+    build:
+      context: .
+      dockerfile: cmd/scanner/Dockerfile
+    container_name: homework-scanner
+    hostname: homework-scanner
+    networks:
+      - homework
+    depends_on:
+      - redis
+  validator:
+    build:
+      context: .
+      dockerfile: cmd/validator/Dockerfile
+    container_name: homework-validator
+    hostname: homework-validator
+    networks:
+      - homework
+    depends_on:
+      - redis
+      - postgres
+  api:
+    build:
+      context: .
+      dockerfile: cmd/api/Dockerfile
+    container_name: homework-api
+    hostname: homework-api
+    ports:
+      - "127.0.0.1:8080:${API_PORT}"
+    networks:
+      - homework
+    depends_on:
+      - postgres
