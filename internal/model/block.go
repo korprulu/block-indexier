@@ -13,6 +13,8 @@ type Block struct {
 	Hash       string `json:"hash"`
 	ParentHash string `json:"parent_hash"`
 	Timestamp  uint64 `json:"timestamp"`
+	Status     string `json:"status"`
+	IsUncle    bool   `json:"is_uncle"`
 
 	Transactions Transactions `json:"transactions,omitempty"`
 }
@@ -29,6 +31,6 @@ func ToBlockModel(ethBlock *types.Block) *Block {
 
 // Save saves a block to the database
 func (b *Block) Save(ctx context.Context, db *pkg.DBClient) error {
-	_, err := db.ExecContext(ctx, "INSERT INTO blocks (number, hash, parent_hash, timestamp) VALUES ($1, $2, $3, $4)", b.Number, b.Hash, b.ParentHash, b.Timestamp)
+	_, err := db.ExecContext(ctx, "INSERT INTO blocks (number, hash, parent_hash, timestamp, status) VALUES ($1, $2, $3, $4, $5)", b.Number, b.Hash, b.ParentHash, b.Timestamp, b.Status)
 	return err
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/korprulu/interview-homework-b/internal/pkg"
@@ -33,11 +32,11 @@ func (tx *Transaction) StreamValue() pkg.StreamValue {
 		"tx_hash":      tx.Hash,
 		"from":         tx.From,
 		"to":           tx.To,
-		"nonce":        tx.Nonce,
+		"nonce":        hexutil.EncodeUint64(tx.Nonce),
 		"data":         tx.Data,
 		"value":        tx.Value,
 		"block_hash":   tx.BlockHash,
-		"block_number": tx.BlockNumber,
+		"block_number": hexutil.EncodeUint64(tx.BlockNumber),
 	}
 }
 
@@ -71,19 +70,31 @@ func (t *TransactionLogs) Scan(src interface{}) error {
 type Transactions []*Transaction
 
 // ToTransaction converts an Ethereum transaction to a Transaction
-func ToTransaction(ctx context.Context, ethClient *pkg.EthClient, tx *types.Transaction, block common.Hash, index int) (*Transaction, error) {
-	from, err := ethClient.TransactionSender(ctx, tx, block, uint(index))
+func ToTransaction(ctx context.Context, ethClient *pkg.EthClient, tx *types.Transaction, block *types.Block, index int) (*Transaction, error) {
+	from, err := ethClient.TransactionSender(ctx, tx, block.Hash(), uint(index))
 	if err != nil {
 		return nil, err
 	}
+	toAddr := tx.To()
+	var to string
+	if toAddr != nil {
+		to = toAddr.Hex()
+	}
+	valueAddr := tx.Value()
+	var value string
+	if valueAddr != nil {
+		value = valueAddr.String()
+	}
 	return &Transaction{
-		Index: uint64(index),
-		Hash:  tx.Hash().Hex(),
-		From:  from.Hex(),
-		To:    tx.To().Hex(),
-		Nonce: tx.Nonce(),
-		Data:  hexutil.Encode(tx.Data()),
-		Value: tx.Value().String(),
+		Index:       uint64(index),
+		Hash:        tx.Hash().Hex(),
+		From:        from.Hex(),
+		To:          to,
+		Nonce:       tx.Nonce(),
+		Data:        hexutil.Encode(tx.Data()),
+		Value:       value,
+		BlockHash:   block.Hash().Hex(),
+		BlockNumber: block.Number().Uint64(),
 	}, nil
 }
 
